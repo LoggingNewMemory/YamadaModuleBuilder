@@ -1,5 +1,4 @@
-# Yamada Magisk Module Builder
-## This Build Script Is Only For Linux
+![Banner](https://github.com/user-attachments/assets/7cb24be5-9714-481d-8225-0f4f95c1ae97)
 
 How to use this?
 
