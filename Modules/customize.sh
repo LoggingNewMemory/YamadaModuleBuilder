@@ -38,8 +38,8 @@ ui_print " "
 sleep 1.5
 
 
-// This actually the method I use for the scripting. Because my script is not
-// On service.sh. Instead I make a new folder containing the script, and execute in service.sh
+# This actually the method I use for the scripting. Because my script is not
+# On service.sh. Instead I make a new folder containing the script, and execute in service.sh
 
 unzip -o "$ZIPFILE" '[Folder Name]/*' -d $MODPATH >&2
 set_perm_recursive $MODPATH/[Folder Name] 0 0 0774 0774

@@ -1,4 +1,4 @@
-// This is a function, so you don't need to chmod 644 everytime
+# This is a function, so you don't need to chmod 644 everytime
 
 tweak() {
 	if [ -f $2 ]; then
@@ -8,6 +8,6 @@ tweak() {
 	fi
 }
 
-// you can use this like this
+# you can use this like this
 
 tweak <your modification>
