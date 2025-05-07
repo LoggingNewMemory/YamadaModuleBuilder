@@ -36,9 +36,18 @@ build_modules() {
     cd "$MODULES_DIR" || exit 1
     MODULE_ID=$(grep "^id=" "module.prop" | cut -d'=' -f2 | tr -d '[:space:]')
 
-    sed -i "s/^version=.*$/version=$VERSION/" "module.prop"
+    # Fix: Use sed without attempting to preserve permissions
+    # Create a temporary file for the sed operation
+    if [ -f "module.prop" ]; then
+        cp "module.prop" "module.prop.tmp"
+        sed "s/^version=.*$/version=$VERSION/" "module.prop.tmp" > "module.prop"
+        rm "module.prop.tmp"
+    fi
+
     if [ -f "customize.sh" ]; then
-        sed -i 's/^ui_print "Version : .*$/ui_print "Version : '"$VERSION"'"/' "customize.sh"
+        cp "customize.sh" "customize.sh.tmp"
+        sed "s/^ui_print \"Version : .*$/ui_print \"Version : $VERSION\"/" "customize.sh.tmp" > "customize.sh"
+        rm "customize.sh.tmp"
     fi
 
     ZIP_NAME="${MODULE_ID}-${VERSION}-${BUILD_TYPE}.zip"
