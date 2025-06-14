@@ -6,9 +6,6 @@
 
 # Telegram Bot Configuration
 export TELEGRAM_BOT_TOKEN="YOUR_BOT_TOKEN_HERE"
-
-# Optional: Add other sensitive configurations here
-# export DISCORD_WEBHOOK_URL="your_discord_webhook"
-# export API_SECRET_KEY="your_api_secret"
+export TELEGRAM_CH_ID="@YourGroupID" # Example only, please replace it
 
 echo "🌸 Megumi configuration loaded successfully!"
