@@ -31,40 +31,127 @@ success() {
 send_to_telegram() {
     local file_path="$1"
     local caption="$2"
-    
+    local chat_id="$3"
+
     if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
         echo "Error: TELEGRAM_BOT_TOKEN is not set in megumi.sh!"
         return 1
     fi
-    
-    if [ -z "$TELEGRAM_CH_ID" ]; then
-        echo "Error: TELEGRAM_CH_ID is not set in megumi.sh!"
+
+    if [ -z "$chat_id" ]; then
+        echo "Error: Chat ID is empty!"
         return 1
     fi
-    
-    echo "Uploading $(basename "$file_path") to Telegram..."
-    
+
+    echo "Uploading $(basename "$file_path") to chat ID: $chat_id..."
+
     # Send document to Telegram
     response=$(curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument" \
-        -F "chat_id=$TELEGRAM_CH_ID" \
+        -F "chat_id=$chat_id" \
         -F "document=@$file_path" \
         -F "caption=$caption")
-    
+
     # Check if upload was successful
     if echo "$response" | grep -q '"ok":true'; then
-        echo "✓ Successfully uploaded $(basename "$file_path")"
+        echo "✓ Successfully uploaded $(basename "$file_path") to $chat_id"
         return 0
     else
-        echo "✗ Failed to upload $(basename "$file_path")"
+        echo "✗ Failed to upload $(basename "$file_path") to $chat_id"
         echo "Response: $response"
         return 1
     fi
 }
 
+# Function to send message to Telegram
+send_message_to_telegram() {
+    local message="$1"
+    local chat_id="$2"
+
+    if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$chat_id" ]; then
+        return 1
+    fi
+
+    curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+        -d "chat_id=$chat_id" \
+        -d "text=$message" \
+        -d "parse_mode=Markdown" > /dev/null
+}
+
+# Function to display available groups and get selection
+select_telegram_groups() {
+    local available_groups=()
+    local group_names=()
+    
+    # Parse TELEGRAM_GROUPS array
+    if [ ${#TELEGRAM_GROUPS[@]} -eq 0 ]; then
+        echo "No Telegram groups configured in megumi.sh"
+        return 1
+    fi
+    
+    echo ""
+    echo "Available Telegram groups:"
+    echo "--------------------------"
+    
+    local index=1
+    for group in "${TELEGRAM_GROUPS[@]}"; do
+        # Parse group entry: "GROUP_NAME:CHAT_ID"
+        local group_name=$(echo "$group" | cut -d':' -f1)
+        local chat_id=$(echo "$group" | cut -d':' -f2)
+        
+        available_groups+=("$chat_id")
+        group_names+=("$group_name")
+        
+        echo "$index. $group_name ($chat_id)"
+        ((index++))
+    done
+    
+    echo "a. All groups"
+    echo "0. Cancel"
+    echo ""
+    
+    while true; do
+        read -p "Select groups (comma-separated numbers, 'a' for all, or '0' to cancel): " selection
+        selection=${selection,,}  # Convert to lowercase
+        
+        if [[ "$selection" == "0" ]]; then
+            return 1
+        elif [[ "$selection" == "a" || "$selection" == "all" ]]; then
+            SELECTED_GROUPS=("${available_groups[@]}")
+            SELECTED_GROUP_NAMES=("${group_names[@]}")
+            return 0
+        else
+            # Parse comma-separated selections
+            SELECTED_GROUPS=()
+            SELECTED_GROUP_NAMES=()
+            IFS=',' read -ra SELECTIONS <<< "$selection"
+            
+            local valid=true
+            for sel in "${SELECTIONS[@]}"; do
+                sel=$(echo "$sel" | tr -d '[:space:]')  # Remove whitespace
+                if [[ "$sel" =~ ^[0-9]+$ ]] && [ "$sel" -ge 1 ] && [ "$sel" -le ${#available_groups[@]} ]; then
+                    local idx=$((sel-1))
+                    SELECTED_GROUPS+=("${available_groups[$idx]}")
+                    SELECTED_GROUP_NAMES+=("${group_names[$idx]}")
+                else
+                    echo "Invalid selection: $sel"
+                    valid=false
+                    break
+                fi
+            done
+            
+            if [ "$valid" = true ] && [ ${#SELECTED_GROUPS[@]} -gt 0 ]; then
+                return 0
+            fi
+        fi
+        
+        echo "Please enter valid selections."
+    done
+}
+
 # Function to prompt for Telegram posting
 prompt_telegram_post() {
     echo ""
-    read -p "Post to testing group? (y/N): " POST_TO_TELEGRAM
+    read -p "Post to Telegram groups? (y/N): " POST_TO_TELEGRAM
     POST_TO_TELEGRAM=${POST_TO_TELEGRAM,,}  # Convert to lowercase
     
     if [[ "$POST_TO_TELEGRAM" == "y" || "$POST_TO_TELEGRAM" == "yes" ]]; then
@@ -116,56 +203,66 @@ build_modules() {
     if [ "$TELEGRAM_ENABLED" = true ]; then
         # Prompt for Telegram posting
         if prompt_telegram_post; then
-            echo ""
-            echo "Uploading to Telegram channel..."
-            
-            # Create a summary message
-            SUMMARY_MESSAGE="🚀 *Yamada Module Build Complete*%0A%0A"
-            SUMMARY_MESSAGE+="📦 *Module:* $MODULE_ID%0A"
-            SUMMARY_MESSAGE+="🏷️ *Version:* $VERSION%0A"
-            SUMMARY_MESSAGE+="🔧 *Build Type:* $BUILD_TYPE%0A%0A"
-            SUMMARY_MESSAGE+="File uploading below... ⬇️"
-            
-            # Send summary message first
-            curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
-                -d "chat_id=$TELEGRAM_CH_ID" \
-                -d "text=$SUMMARY_MESSAGE" \
-                -d "parse_mode=Markdown" > /dev/null
-            
-            # Upload the zip file
-            if [ -f "$BUILD_DIR/$ZIP_NAME" ]; then
-                caption="📱 $MODULE_ID - $VERSION ($BUILD_TYPE)"
+            # Select groups to post to
+            if select_telegram_groups; then
+                echo ""
+                echo "Uploading to selected Telegram groups..."
                 
-                if send_to_telegram "$BUILD_DIR/$ZIP_NAME" "$caption"; then
-                    echo ""
-                    echo "✅ Upload successful!"
+                # Create a summary message
+                SUMMARY_MESSAGE="🚀 *Yamada Module Build Complete*%0A%0A"
+                SUMMARY_MESSAGE+="📦 *Module:* $MODULE_ID%0A"
+                SUMMARY_MESSAGE+="🏷️ *Version:* $VERSION%0A"
+                SUMMARY_MESSAGE+="🔧 *Build Type:* $BUILD_TYPE%0A%0A"
+                SUMMARY_MESSAGE+="File uploading below... ⬇️"
+                
+                local upload_success=0
+                local upload_total=${#SELECTED_GROUPS[@]}
+                
+                # Loop through selected groups
+                for i in "${!SELECTED_GROUPS[@]}"; do
+                    local chat_id="${SELECTED_GROUPS[$i]}"
+                    local group_name="${SELECTED_GROUP_NAMES[$i]}"
                     
-                    # Send completion message
-                    COMPLETION_MESSAGE="✅ *Upload Complete!*%0A%0AModule uploaded successfully to the testing group."
-                    curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
-                        -d "chat_id=$TELEGRAM_CH_ID" \
-                        -d "text=$COMPLETION_MESSAGE" \
-                        -d "parse_mode=Markdown" > /dev/null
-                else
                     echo ""
-                    echo "❌ Upload failed!"
+                    echo "📤 Posting to: $group_name"
                     
-                    # Send failure message
-                    FAILURE_MESSAGE="❌ *Upload Failed*%0A%0AThere was an issue uploading the module to the testing group."
-                    curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
-                        -d "chat_id=$TELEGRAM_CH_ID" \
-                        -d "text=$FAILURE_MESSAGE" \
-                        -d "parse_mode=Markdown" > /dev/null
-                fi
+                    # Send summary message first
+                    send_message_to_telegram "$SUMMARY_MESSAGE" "$chat_id"
+                    
+                    # Upload the zip file
+                    if [ -f "$BUILD_DIR/$ZIP_NAME" ]; then
+                        caption="📱 $MODULE_ID - $VERSION ($BUILD_TYPE)"
+                        
+                        if send_to_telegram "$BUILD_DIR/$ZIP_NAME" "$caption" "$chat_id"; then
+                            ((upload_success++))
+                            
+                            # Send completion message
+                            COMPLETION_MESSAGE="✅ *Upload Complete!*%0A%0AModule uploaded successfully to $group_name."
+                            send_message_to_telegram "$COMPLETION_MESSAGE" "$chat_id"
+                        else
+                            # Send failure message
+                            FAILURE_MESSAGE="❌ *Upload Failed*%0A%0AThere was an issue uploading the module to $group_name."
+                            send_message_to_telegram "$FAILURE_MESSAGE" "$chat_id"
+                        fi
+                    else
+                        echo "Error: ZIP file not found at $BUILD_DIR/$ZIP_NAME"
+                    fi
+                done
+                
+                echo ""
+                echo "📊 Upload Summary:"
+                echo "✅ Successful: $upload_success/$upload_total groups"
+                echo "❌ Failed: $((upload_total - upload_success))/$upload_total groups"
+                
             else
-                echo "Error: ZIP file not found at $BUILD_DIR/$ZIP_NAME"
+                echo "Telegram upload cancelled."
             fi
         else
             echo "Skipping Telegram upload."
         fi
     else
         echo ""
-        echo "Post to telegram disabled, please setup megumi.sh and set TELEGRAM_CH_ID"
+        echo "Post to telegram disabled, please setup megumi.sh and configure TELEGRAM_GROUPS array"
     fi
 }
 
