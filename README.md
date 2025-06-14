@@ -1,19 +1,19 @@
-![Banner](https://github.com/user-attachments/assets/7cb24be5-9714-481d-8225-0f4f95c1ae97)
+![YMB](https://github.com/user-attachments/assets/6c98b53c-c320-4565-9ae0-f7fbc9136936)
 
 How to use this?
 
-1. Git clone this repo
+- Git clone this repo
 ```
 git clone https://github.com/LoggingNewMemory/YamadaModuleBuilder
 ```
-2. Change the directory
+- Change the directory
 ```
 cd YamadaModuleBuilder
 ```
-3. Modify the "Modules" (This is where your Magisk Module template)
-
-4. Run the Build.sh
+- Modify the "Modules" (This is where your Magisk Module template)
+- Modify megumi.sh (Optional)
+- Run the Build.sh
 ```
 sh Build.sh
 ```
-5. Your .zip should be on "Build" Folder
+- Your .zip should be on "Build" Folder
