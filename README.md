@@ -1,5 +1,7 @@
 ![YMB](https://github.com/user-attachments/assets/6c98b53c-c320-4565-9ae0-f7fbc9136936)
 
+[CHANGELOG](https://github.com/LoggingNewMemory/YamadaModuleBuilder/blob/main/CHANGELOG.md)
+
 How to use this?
 
 - Git clone this repo
